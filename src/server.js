@@ -6,9 +6,9 @@ const {AuthenticateEndpoint} = require("./endpoints/authenticate-endpoint");
 const {ReportRaidEndpoint} = require("./endpoints/report-raid-endpoint");
 
 const app = express();
-const PORT = 3000;
+const PORT = 80;
 
-app.listen(PORT, (error) => {
+app.listen(PORT, '0.0.0.0', (error) => {
     if (!error) console.log("Server is Successfully Running, and App is listening on port " + PORT)
     else console.log("Error occurred, server can't start", error);
 
