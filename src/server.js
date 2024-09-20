@@ -1,9 +1,8 @@
 const express = require('express');
-const { Client, Events, GatewayIntentBits } = require('discord.js');
-const { token } = require('../config.json');
 const {databaseInit, insertRaid} = require("./database");
 const {AuthenticateEndpoint} = require("./endpoints/authenticate-endpoint");
 const {ReportRaidEndpoint} = require("./endpoints/report-raid-endpoint");
+require("./discord/discord-bot");
 
 const app = express();
 const PORT = 80;
@@ -35,10 +34,4 @@ function registerEndpoints(app) {
 }
 
 
-
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
-
-client.login(token).then(r => {
-    console.log("Discord Bot Logged in")
-}).catch(console.error);
 

@@ -142,4 +142,23 @@ async function insertPlayer(uuid, username) {
     }
 }
 
-module.exports = { databaseInit, insertRaid, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer };
+async function getRaids(uuid) {
+    try {
+        const connection = await pool.getConnection();
+
+        const query = `
+            SELECT * FROM raids
+            WHERE player_1 = ? OR player_2 = ? OR player_3 = ? OR player_4 = ?;
+        `;
+
+        const [rows] = await connection.execute(query, [uuid, uuid, uuid, uuid]);
+        connection.release();
+        return rows;
+    } catch (err) {
+        console.error("Error getting raids: ", err);
+    }
+
+    return [];
+}
+
+module.exports = { databaseInit, insertRaid, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids };
