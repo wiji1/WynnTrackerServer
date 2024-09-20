@@ -43,8 +43,7 @@ async function createTables() {
 
         const createPlayerTableQuery = `
             CREATE TABLE IF NOT EXISTS players (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                uuid VARCHAR(36) NOT NULL UNIQUE,
+                uuid VARCHAR(36) NOT NULL PRIMARY KEY,
                 username VARCHAR(16) NOT NULL
             );
         `;
@@ -138,7 +137,7 @@ async function insertPlayer(uuid, username) {
         await connection.execute(insertQuery, [uuid, username]);
         connection.release();
     } catch (err) {
-        console.error("Error inserting player: ", err);
+        if (err.code !== 'ER_DUP_ENTRY') console.error("Error inserting player: ", err);
     }
 }
 
