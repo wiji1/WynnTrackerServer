@@ -5,7 +5,7 @@ const {requestUUID} = require("../misc");
 
 class ReportAspectEndpoint {
     constructor() {
-        this.recentReport = false;
+        this.recentReports = new Set();
     }
 
     async call(req, res) {
@@ -14,9 +14,10 @@ class ReportAspectEndpoint {
 
         if (!token || !giver || !receiver) return res.status(400).send("Missing parameters");
 
-        console.log("Aspect report attempt: " + reporter);
-        if (this.recentReport) return res.status(200).send("Aspect reported");
-        console.log("Aspect report not recent");
+        const reportKey = `${giver}-${receiver}-${reporter}`;
+        if (this.recentReports.has(reportKey)) {
+            return res.status(200).send("Aspect reported");
+        }
 
         let tokenObject = await getToken(reporter);
 
@@ -36,13 +37,10 @@ class ReportAspectEndpoint {
         await insertAspect(giverUUID, receiverUUID, reporter);
         res.status(200).send("Aspect reported");
 
-        this.recentReport = true;
-        console.log("Aspect report cooldown started");
-
+        this.recentReports.add(reportKey);
         setTimeout(() => {
-            console.log("Aspect report cooldown ended");
-            this.recentReport = false;
-        }, 500);
+            this.recentReports.delete(reportKey);
+        }, 1000);
     }
 }
 
