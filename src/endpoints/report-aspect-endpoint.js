@@ -14,7 +14,7 @@ class ReportAspectEndpoint {
 
         if (!token || !giver || !receiver) return res.status(400).send("Missing parameters");
 
-        const reportKey = `${giver}-${receiver}-${reporter}`;
+        const reportKey = `${giver}-${receiver}`;
         if (this.recentReports.has(reportKey)) {
             await this.recentReports.get(reportKey);
             return res.status(200).send("Aspect reported");
