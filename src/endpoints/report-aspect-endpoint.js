@@ -5,7 +5,7 @@ const {requestUUID} = require("../misc");
 
 class ReportAspectEndpoint {
     constructor() {
-        this.recentReports = new Set();
+        this.recentReports = new Map();
     }
 
     async call(req, res) {
@@ -16,31 +16,36 @@ class ReportAspectEndpoint {
 
         const reportKey = `${giver}-${receiver}-${reporter}`;
         if (this.recentReports.has(reportKey)) {
+            await this.recentReports.get(reportKey);
             return res.status(200).send("Aspect reported");
         }
 
-        let tokenObject = await getToken(reporter);
+        const reportPromise = (async () => {
+            let tokenObject = await getToken(reporter);
 
-        if (!tokenObject || tokenObject.token !== token || !tokenObject.isAuthenticated()) return res.status(400).send("Invalid token");
-        if (!await isPlayerInGuild(reporter)) return res.status(400).send("Reporter is not in the guild");
+            if (!tokenObject || tokenObject.token !== token || !tokenObject.isAuthenticated()) return res.status(400).send("Invalid token");
+            if (!await isPlayerInGuild(reporter)) return res.status(400).send("Reporter is not in the guild");
 
-        let giverUUID = await getPlayerUUID(giver);
-        let receiverUUID = await getPlayerUUID(receiver);
+            let giverUUID = await getPlayerUUID(giver);
+            let receiverUUID = await getPlayerUUID(receiver);
 
-        if (!giverUUID) giverUUID = await requestUUID(giver);
-        if (!receiverUUID) receiverUUID = await requestUUID(receiver);
+            if (!giverUUID) giverUUID = await requestUUID(giver);
+            if (!receiverUUID) receiverUUID = await requestUUID(receiver);
 
-        if (!giverUUID || !receiverUUID) return res.status(400).send("Invalid player");
+            if (!giverUUID || !receiverUUID) return res.status(400).send("Invalid player");
 
-        console.log("Reporting aspect: ", giver, receiver, reporter);
+            console.log("Reporting aspect: ", giver, receiver, reporter);
 
-        await insertAspect(giverUUID, receiverUUID, reporter);
-        res.status(200).send("Aspect reported");
+            await insertAspect(giverUUID, receiverUUID, reporter);
+            res.status(200).send("Aspect reported");
 
-        this.recentReports.add(reportKey);
-        setTimeout(() => {
-            this.recentReports.delete(reportKey);
-        }, 500);
+            setTimeout(() => {
+                this.recentReports.delete(reportKey);
+            }, 500);
+        })();
+
+        this.recentReports.set(reportKey, reportPromise);
+        await reportPromise;
     }
 }
 
