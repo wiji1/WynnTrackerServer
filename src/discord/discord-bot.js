@@ -2,6 +2,7 @@ const {Client, GatewayIntentBits, Collection, Events} = require("discord.js");
 const {join} = require("path");
 const {token} = require("../../config.json");
 const {readdirSync} = require("fs");
+require('./deploy-commands');
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 

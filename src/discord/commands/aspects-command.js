@@ -1,13 +1,11 @@
 const { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder } = require("discord.js");
 const axios = require('axios');
-const {getPlayerUUID, getRaids, getPlayerUsername} = require("../../database");
-
-const raids = ["Nest of the Grootslangs", "Orphion's Nexus of Light", "The Canyon Colossus", "The Nameless Anomaly"]
+const {getPlayerUUID, getRaids, getPlayerUsername, getAspects} = require("../../database");
 
 module.exports = {
     data: new SlashCommandBuilder()
-        .setName('raids')
-        .setDescription('Returns data on the given player\'s completed guild raids')
+        .setName('aspects')
+        .setDescription('Returns data on the given player\'s received guild aspects')
         .addStringOption(option =>
             option.setName('player')
                 .setDescription('The name of the player')
@@ -23,12 +21,11 @@ module.exports = {
 
         playerName = await getPlayerUsername(uuid);
 
-        let raidCounts = [0, 0, 0, 0]
-        let raidsData = await getRaids(uuid);
-        for (let i = 0; i < raidsData.length; i++) {
-            let raidIndex = raidsData[i].raid;
-            raidCounts[raidIndex]++;
-        }
+        let aspectData = await getAspects(uuid);
+        let raidData = await getRaids(uuid);
+
+        let totalAspects = aspectData.length;
+        let owedAspects = Math.max(Math.floor(raidData.length / 2) - totalAspects, 0);
 
         const response = await axios.get(`https://crafatar.com/renders/head/${uuid}?overlay=true`, { responseType: 'arraybuffer' });
         const buffer = Buffer.from(response.data, 'binary');
@@ -36,16 +33,14 @@ module.exports = {
 
         const exampleEmbed = new EmbedBuilder()
             .setColor(0x0099FF)
-            .setAuthor({ name: 'Player Guild Raid Stats' })
+            .setAuthor({ name: 'Player Guild Aspects' })
             .setTitle(`**${playerName}**`)
             .setThumbnail('attachment://thumbnail.png')
             .addFields(
                 { name: '\u200B', value: '\u200B' },
-                { name: 'Nest of the Grootslangs', value: `\`\`\`Completions: ${raidCounts[0].toString()}   \`\`\``, inline: true },
-                { name: "Orphion's Nexus of Light", value: `\`\`\`Completions: ${raidCounts[1].toString()}   \`\`\``, inline: true },
-                { name: '\u200B', value: '\u200B'},
-                { name: 'The Canyon Colossus', value: `\`\`\`Completions: ${raidCounts[2].toString()}   \`\`\``, inline: true },
-                { name: 'The Nameless Anomaly', value: `\`\`\`Completions: ${raidCounts[3].toString()}   \`\`\``, inline: true }
+                { name: 'Total Raids Completed', value: `\`\`\`${raidData.length}\`\`\`` },
+                { name: "Aspects Given", value: `\`\`\`${totalAspects}\`\`\``},
+                { name: 'Owed Aspects', value: `\`\`\`${owedAspects}\`\`\``},
             )
 
         await interaction.reply({ embeds: [exampleEmbed], files: [attachment] });

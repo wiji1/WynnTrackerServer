@@ -189,4 +189,23 @@ async function getRaids(uuid) {
     return [];
 }
 
-module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids };
+async function getAspects(uuid) {
+    try {
+        const connection = await pool.getConnection();
+
+        const query = `
+            SELECT * FROM aspects
+            WHERE receiver = ?;
+        `;
+
+        const [rows] = await connection.execute(query, [uuid]);
+        connection.release();
+        return rows;
+    } catch (err) {
+        console.error("Error getting aspects: ", err);
+    }
+
+    return [];
+}
+
+module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids, getAspects };
