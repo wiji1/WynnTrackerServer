@@ -40,7 +40,7 @@ class ReportAspectEndpoint {
         this.recentReports.add(reportKey);
         setTimeout(() => {
             this.recentReports.delete(reportKey);
-        }, 1000);
+        }, 500);
     }
 }
 
