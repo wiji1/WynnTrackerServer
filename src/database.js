@@ -49,6 +49,19 @@ async function createTables() {
         `;
 
         await connection.execute(createPlayerTableQuery);
+
+        const createAspectTableQuery = `
+            CREATE TABLE IF NOT EXISTS aspects (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                giver VARCHAR(36) NOT NULL,
+                receiver VARCHAR(36) NOT NULL,
+                time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                reporter VARCHAR(36) NOT NULL
+            );
+        `;
+
+        await connection.execute(createAspectTableQuery);
+
         connection.release();
     } catch (err) {
         console.error("Error creating table: ", err);
@@ -68,6 +81,22 @@ async function insertRaid(raid, player1, player2, player3, player4, reporter) {
         connection.release();
     } catch (err) {
         console.error("Error inserting raid: ", err);
+    }
+}
+
+async function insertAspect(giver, receiver, reporter) {
+    try {
+        const connection = await pool.getConnection();
+
+        const insertQuery = `
+            INSERT INTO aspects (giver, receiver, reporter)
+            VALUES (?, ?, ?);
+        `;
+
+        await connection.execute(insertQuery, [giver, receiver, reporter]);
+        connection.release();
+    } catch (err) {
+        console.error("Error inserting aspect: ", err);
     }
 }
 
@@ -160,4 +189,4 @@ async function getRaids(uuid) {
     return [];
 }
 
-module.exports = { databaseInit, insertRaid, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids };
+module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids };

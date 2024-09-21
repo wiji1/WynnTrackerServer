@@ -1,8 +1,7 @@
 const {getToken} = require("../authentication");
 const {isPlayerInGuild} = require("../wynn-api");
 const {insertRaid, getPlayerUUID, insertPlayer} = require("../database");
-const request = require('request');
-const uuid = require("uuid");
+const {requestUUID} = require("../misc");
 
 class ReportRaidEndpoint {
     constructor() {
@@ -27,7 +26,7 @@ class ReportRaidEndpoint {
 
             let uuid = await getPlayerUUID(player);
 
-            if (!uuid) uuid = await this.requestUUID(player);
+            if (!uuid) uuid = await requestUUID(player);
             if (!uuid) return res.status(400).send("Invalid player: " + player);
             if (this.checkForRecentRaid(uuid)) return res.status(200).send("Raid Reported");
 
@@ -51,35 +50,6 @@ class ReportRaidEndpoint {
             setTimeout(() => {
                 this.recentRaids = this.recentRaids.filter(p => p !== player);
             }, 60000);
-        });
-    }
-
-    requestUUID(username) {
-        return new Promise((resolve, reject) => {
-            const url = `https://api.mojang.com/users/profiles/minecraft/${username}`;
-
-            request(url, function (error, response, body) {
-                if (!error && response.statusCode === 200) {
-                    let data = JSON.parse(body);
-                    if (data && data.id) {
-                        let id = data.id.replace(
-                            /(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})/,
-                            '$1-$2-$3-$4-$5'
-                        );
-                        resolve(id);
-
-                        insertPlayer(id, username).catch(err => console.error('Error inserting player:', err));
-                    } else {
-                        resolve(null);
-                    }
-                } else {
-                    console.error('Request failed', error);
-                    reject(error);
-                }
-            });
-        }).catch(err => {
-            console.error('Error in requestUUID:', err);
-            return null;
         });
     }
 }

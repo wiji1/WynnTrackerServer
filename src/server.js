@@ -4,6 +4,7 @@ const {AuthenticateEndpoint} = require("./endpoints/authenticate-endpoint");
 const {ReportRaidEndpoint} = require("./endpoints/report-raid-endpoint");
 const {IsAuthenticatedEndpoint} = require("./endpoints/is-authenticated-endpoint");
 require("./discord/discord-bot");
+const {ReportAspectEndpoint} = require("./endpoints/report-aspect-endpoint");
 
 const app = express();
 const PORT = 80;
@@ -19,6 +20,7 @@ app.listen(PORT, '0.0.0.0', (error) => {
 const endpoints = {
     'authenticate': new AuthenticateEndpoint(),
     'report-raid': new ReportRaidEndpoint(),
+    'report-aspect': new ReportAspectEndpoint(),
     'is-authenticated': new IsAuthenticatedEndpoint()
 };
 
