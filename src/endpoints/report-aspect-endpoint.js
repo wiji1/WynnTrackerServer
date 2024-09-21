@@ -14,7 +14,9 @@ class ReportAspectEndpoint {
 
         if (!token || !giver || !receiver) return res.status(400).send("Missing parameters");
 
+        console.log("Aspect report attempt: " + reporter);
         if (this.recentReport) return res.status(200).send("Aspect reported");
+        console.log("Aspect report not recent");
 
         let tokenObject = await getToken(reporter);
 
@@ -35,8 +37,10 @@ class ReportAspectEndpoint {
         res.status(200).send("Aspect reported");
 
         this.recentReport = true;
+        console.log("Aspect report cooldown started");
 
         setTimeout(() => {
+            console.log("Aspect report cooldown ended");
             this.recentReport = false;
         }, 500);
     }
