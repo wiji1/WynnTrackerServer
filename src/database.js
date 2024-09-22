@@ -215,4 +215,44 @@ async function getAspects(uuid) {
     return [];
 }
 
-module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID, getPlayerUsername, insertPlayer, getRaids, getAspects };
+async function getOwedAspects() {
+    try {
+        let playerMap = new Map();
+
+        const connection = await pool.getConnection();
+        const query = `
+            SELECT uuid FROM players;
+        `;
+
+        const [rows] = await connection.execute(query);
+
+        for (const row of rows) {
+            let uuid = row.uuid;
+            let aspects = await getAspects(uuid);
+            let raids = await getRaids(uuid);
+
+            let totalAspects = aspects.length;
+            let owedAspects = Math.max(Math.floor(raids.length / 2) - totalAspects, 0);
+
+            playerMap.set(uuid, owedAspects);
+        }
+
+        connection.release();
+
+
+        playerMap = new Map([...playerMap.entries()].sort((a, b) => b[1] - a[1]));
+
+        let playerArray = [...playerMap.entries()];
+        playerArray = playerArray.filter(([key, value]) => value > 0);
+        playerMap = new Map(playerArray);
+
+        return playerMap;
+    } catch (err) {
+        console.error("Error getting owed aspects: ", err);
+    }
+
+    return [];
+}
+
+module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID,
+    getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects };
