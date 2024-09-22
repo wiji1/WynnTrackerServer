@@ -11,10 +11,17 @@ module.exports = {
         .addStringOption(option =>
             option.setName('player')
                 .setDescription('The name of the player')
-                .setRequired(true)),
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('days')
+                .setDescription('The time period to check for raids')
+        ),
     async execute(interaction) {
         let playerName = interaction.options.getString('player');
         let uuid = await getPlayerUUID(playerName);
+
+        let days = interaction.options.getString('days');
+        if (days) days = parseInt(days);
 
         if (!uuid) {
             await interaction.reply(`Unable to find player with the name ${playerName}`);
@@ -24,7 +31,7 @@ module.exports = {
         playerName = await getPlayerUsername(uuid);
 
         let raidCounts = [0, 0, 0, 0]
-        let raidsData = await getRaids(uuid);
+        let raidsData = await getRaids(uuid, (days) ? days : -1);
         for (let i = 0; i < raidsData.length; i++) {
             let raidIndex = raidsData[i].raid;
             raidCounts[raidIndex]++;
@@ -39,6 +46,7 @@ module.exports = {
             .setAuthor({ name: 'Player Guild Raid Stats' })
             .setTitle(`**${playerName}**`)
             .setThumbnail('attachment://thumbnail.png')
+            .setDescription(`*${days ? `Last ${days} Day` + (days !== 1 ? "s" : "") : 'All Time'}*`)
             .addFields(
                 { name: '\u200B', value: '\u200B' },
                 { name: 'Nest of the Grootslangs', value: `\`\`\`Completions: ${raidCounts[0].toString()}   \`\`\``, inline: true },

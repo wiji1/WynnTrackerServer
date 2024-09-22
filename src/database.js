@@ -170,16 +170,23 @@ async function insertPlayer(uuid, username) {
     }
 }
 
-async function getRaids(uuid) {
+async function getRaids(uuid, days = -1) {
     try {
         const connection = await pool.getConnection();
 
-        const query = `
+        let query = `
             SELECT * FROM raids
-            WHERE player_1 = ? OR player_2 = ? OR player_3 = ? OR player_4 = ?;
+            WHERE (player_1 = ? OR player_2 = ? OR player_3 = ? OR player_4 = ?)
         `;
 
-        const [rows] = await connection.execute(query, [uuid, uuid, uuid, uuid]);
+        const params = [uuid, uuid, uuid, uuid];
+
+        if (days > -1) {
+            query += ` AND time > DATE_SUB(NOW(), INTERVAL ? DAY)`;
+            params.push(days);
+        }
+
+        const [rows] = await connection.execute(query, params);
         connection.release();
         return rows;
     } catch (err) {
