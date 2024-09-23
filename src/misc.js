@@ -1,6 +1,14 @@
 const request = require("request");
 const {insertPlayer} = require("./database");
 
+const raids = [
+  { name: "All Raids", id: -1 },
+  { name: "Nest of the Grootslangs", id: 0 },
+  { name: "Orphion's Nexus of Light", id: 1 },
+  { name: "The Canyon Colossus", id: 2 },
+  { name: "The Nameless Anomaly", id: 3 }
+]
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -34,4 +42,4 @@ function requestUUID(username) {
   });
 }
 
-module.exports = {sleep, requestUUID};
+module.exports = {sleep, requestUUID, raids};

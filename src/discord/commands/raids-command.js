@@ -2,8 +2,6 @@ const { SlashCommandBuilder, AttachmentBuilder, EmbedBuilder } = require("discor
 const axios = require('axios');
 const {getPlayerUUID, getRaids, getPlayerUsername} = require("../../database");
 
-const raids = ["Nest of the Grootslangs", "Orphion's Nexus of Light", "The Canyon Colossus", "The Nameless Anomaly"]
-
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('raids')

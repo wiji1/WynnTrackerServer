@@ -254,5 +254,44 @@ async function getOwedAspects() {
     return [];
 }
 
+async function getLeaderboard(raid, days = -1) {
+    try {
+        let playerMap = new Map();
+
+        const connection = await pool.getConnection();
+        const query = `
+            SELECT uuid FROM players;
+        `;
+
+        const [rows] = await connection.execute(query);
+
+        for (const row of rows) {
+            let uuid = row.uuid;
+            let raids = await getRaids(uuid, days);
+
+            let raidCount = 0;
+            for (const raidRow of raids) {
+                if ( raid === -1 || raidRow.raid === raid) raidCount++;
+            }
+
+            playerMap.set(uuid, raidCount);
+        }
+
+        connection.release();
+
+        playerMap = new Map([...playerMap.entries()].sort((a, b) => b[1] - a[1]));
+
+        let leaderArray = [...playerMap.entries()];
+        leaderArray = leaderArray.filter(([key, value]) => value > 0);
+        playerMap = new Map(leaderArray);
+
+        return playerMap;
+    } catch (err) {
+        console.error("Error getting leaderboard: ", err);
+    }
+
+    return [];
+}
+
 module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID,
-    getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects };
+    getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects, getLeaderboard };
