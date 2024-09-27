@@ -43,6 +43,7 @@ module.exports = {
                 .setDescription("\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af")
                 .setTitle(getRaidName(raid))
                 .setAuthor({ name: 'Guild Raid Leaderboard' })
+                .setDescription(`*${days ? `Last ${days} Day` + (days !== 1 ? "s" : "") : 'All Time'}*`)
                 .addFields(...currentFields)
                 .setFooter({ text: `Page ${page + 1} of ${totalPages}` });
         };
