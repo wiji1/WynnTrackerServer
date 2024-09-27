@@ -10,9 +10,9 @@ class ReportRaidEndpoint {
 
     async call(req, res) {
         let token = req.query.token;
-        let {raid, player1, player2, player3, player4, reporter} = req.query;
+        let {raid, player1, player2, player3, player4, reporter, seasonRating, guildXP} = req.query;
 
-        if (!raid || !token || !player1 || !player2 || !player3 || !player4 || !reporter) return res.status(400).send("Missing parameters");
+        if (!raid || !token || !player1 || !player2 || !player3 || !player4 || !reporter || !seasonRating || !guildXP) return res.status(400).send("Missing parameters");
 
         let tokenObject = await getToken(reporter);
 
@@ -33,9 +33,9 @@ class ReportRaidEndpoint {
             players[i] = uuid;
         }
 
-        console.log("Reporting raid: ", raid, player1, player2, player3, player4, reporter);
+        console.log("Reporting raid: ", raid, player1, player2, player3, player4, reporter, seasonRating, guildXP);
 
-        await insertRaid(raid, players[0], players[1], players[2], players[3], reporter);
+        await insertRaid(raid, players[0], players[1], players[2], players[3], reporter, seasonRating, guildXP);
         this.addRecentRaid(players);
         res.status(200).send("Raid reported");
     }
