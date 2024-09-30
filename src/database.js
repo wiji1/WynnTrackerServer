@@ -162,13 +162,14 @@ async function insertPlayer(uuid, username) {
 
         const insertQuery = `
             INSERT INTO players (uuid, username)
-            VALUES (?, ?);
+            VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE username = VALUES(username);
         `;
 
         await connection.execute(insertQuery, [uuid, username]);
         connection.release();
     } catch (err) {
-        if (err.code !== 'ER_DUP_ENTRY') console.error("Error inserting player: ", err);
+        console.error("Error inserting player: ", err);
     }
 }
 
