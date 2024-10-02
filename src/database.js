@@ -296,5 +296,42 @@ async function getLeaderboard(raid, days = -1) {
     return [];
 }
 
-module.exports = { databaseInit, insertRaid, insertAspect, checkForRecentRaid, getPlayerUUID,
+async function getGXPLeaderboard(days = -1) {
+    try {
+        let playerMap = new Map();
+
+        const connection = await pool.getConnection();
+        const query = `
+            SELECT player_1, player_2, player_3, player_4, guild_xp FROM raids;
+        `;
+
+        const [rows] = await connection.execute(query);
+
+        for (const row of rows) {
+            let uuid = row.uuid;
+            let guildXP = row.guild_xp;
+
+            if (row.player_1) playerMap.set(row.player_1, (playerMap.get(row.player_1) || 0) + guildXP);
+            if (row.player_2) playerMap.set(row.player_2, (playerMap.get(row.player_2) || 0) + guildXP);
+            if (row.player_3) playerMap.set(row.player_3, (playerMap.get(row.player_3) || 0) + guildXP);
+            if (row.player_4) playerMap.set(row.player_4, (playerMap.get(row.player_4) || 0) + guildXP);
+        }
+
+        connection.release();
+
+        playerMap = new Map([...playerMap.entries()].sort((a, b) => b[1] - a[1]));
+
+        let leaderArray = [...playerMap.entries()];
+        leaderArray = leaderArray.filter(([key, value]) => value > 0);
+        playerMap = new Map(leaderArray);
+
+        return playerMap;
+    } catch (err) {
+        console.error("Error getting leaderboard: ", err);
+    }
+
+    return [];
+}
+
+module.exports = { databaseInit, insertRaid, insertAspect, getGXPLeaderboard, getPlayerUUID,
     getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects, getLeaderboard };
