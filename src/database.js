@@ -301,18 +301,13 @@ async function getGXPLeaderboard(days = -1) {
         let playerMap = new Map();
 
         const connection = await pool.getConnection();
-        let query = `
-            SELECT player_1, player_2, player_3, player_4, guild_xp FROM raids;
-        `;
-
-        const params = [];
+        let query = `SELECT player_1, player_2, player_3, player_4, guild_xp FROM raids`;
 
         if (days > -1) {
-            query += ` AND time > DATE_SUB(NOW(), INTERVAL ? DAY)`;
-            params.push(days);
+            query += ` WHERE time > DATE_SUB(NOW(), INTERVAL ${days} DAY)`;
         }
 
-        const [rows] = await connection.execute(query, params);
+        const [rows] = await connection.execute(query);
 
         for (const row of rows) {
             let uuid = row.uuid;
