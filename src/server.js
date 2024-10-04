@@ -5,6 +5,7 @@ const {ReportRaidEndpoint} = require("./endpoints/report-raid-endpoint");
 const {IsAuthenticatedEndpoint} = require("./endpoints/is-authenticated-endpoint");
 require("./discord/discord-bot");
 const {ReportAspectEndpoint} = require("./endpoints/report-aspect-endpoint");
+const {initQueue} = require("./player-queue");
 
 const app = express();
 const PORT = 80;
@@ -15,6 +16,7 @@ app.listen(PORT, '0.0.0.0', (error) => {
 
     databaseInit();
     registerEndpoints(app);
+    initQueue();
 });
 
 const endpoints = {

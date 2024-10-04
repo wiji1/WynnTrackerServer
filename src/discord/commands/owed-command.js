@@ -6,6 +6,7 @@ module.exports = {
         .setName('owed')
         .setDescription('Returns data on players who are owed the most guild aspects'),
     async execute(interaction) {
+        interaction.deferReply();
         let players = await getOwedAspects();
         let fields = [];
 
@@ -30,7 +31,7 @@ module.exports = {
         };
 
         let currentPage = 0;
-        const embedMessage = await interaction.reply({ embeds: [generateEmbed(currentPage)], fetchReply: true });
+        const embedMessage = await interaction.editReply({ embeds: [generateEmbed(currentPage)], fetchReply: true });
 
         if (totalPages > 1) {
             const generateActionRow = (page) => {

@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 const { join } = require("path");
 const fs = require("fs");
+const {getPlayerGuild} = require("./wynn-api");
 
 let pool;
 
@@ -46,7 +47,8 @@ async function createTables() {
         const createPlayerTableQuery = `
             CREATE TABLE IF NOT EXISTS players (
                 uuid VARCHAR(36) NOT NULL PRIMARY KEY,
-                username VARCHAR(16) NOT NULL
+                username VARCHAR(16) NOT NULL,
+                guild VARCHAR(4) DEFAULT NULL
             );
         `;
 
@@ -157,19 +159,59 @@ async function getPlayerUsername(uuid) {
 }
 
 async function insertPlayer(uuid, username) {
+    let guild = await getPlayerGuild(uuid);
+
     try {
         const connection = await pool.getConnection();
 
         const insertQuery = `
-            INSERT INTO players (uuid, username)
-            VALUES (?, ?)
-            ON DUPLICATE KEY UPDATE username = VALUES(username);
+            INSERT INTO players (uuid, username, guild)
+            VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE username = VALUES(username), guild = VALUES(guild);
         `;
 
-        await connection.execute(insertQuery, [uuid, username]);
+        await connection.execute(insertQuery, [uuid, username, guild]);
         connection.release();
     } catch (err) {
         console.error("Error inserting player: ", err);
+    }
+}
+
+async function getGuild(uuid) {
+    try {
+        const connection = await pool.getConnection();
+
+        const query = `
+            SELECT guild FROM players
+            WHERE uuid = ?;
+        `;
+
+        const [rows] = await connection.execute(query, [uuid]);
+        connection.release();
+        return rows[0].guild;
+    } catch (err) {
+        console.error("Error getting player guild: ", err);
+    }
+
+    return null;
+}
+
+async function updateGuild(uuid) {
+    let guild = await getPlayerGuild(uuid);
+
+    try {
+        const connection = await pool.getConnection();
+
+        const updateQuery = `
+            UPDATE players
+            SET guild = ?
+            WHERE uuid = ?;
+        `;
+
+        await connection.execute(updateQuery, [guild, uuid]);
+        connection.release();
+    } catch (err) {
+        console.error("Error updating guild: ", err);
     }
 }
 
@@ -219,15 +261,19 @@ async function getAspects(uuid) {
 }
 
 async function getOwedAspects() {
+    const configPath = join(__dirname, '../config.json');
+    const data = fs.readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(data);
+
     try {
         let playerMap = new Map();
 
         const connection = await pool.getConnection();
         const query = `
-            SELECT uuid FROM players;
+            SELECT uuid FROM players WHERE guild = ?;
         `;
 
-        const [rows] = await connection.execute(query);
+        const [rows] = await connection.execute(query, [config["guild-tag"]]);
 
         for (const row of rows) {
             let uuid = row.uuid;
@@ -335,5 +381,23 @@ async function getGXPLeaderboard(days = -1) {
     return [];
 }
 
+async function getPlayers() {
+    try {
+        const connection = await pool.getConnection();
+
+        const query = `
+            SELECT * FROM players;
+        `;
+
+        const [rows] = await connection.execute(query);
+        connection.release();
+        return rows;
+    } catch (err) {
+        console.error("Error getting players: ", err);
+    }
+
+    return [];
+}
+
 module.exports = { databaseInit, insertRaid, insertAspect, getGXPLeaderboard, getPlayerUUID,
-    getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects, getLeaderboard };
+    getPlayerUsername, insertPlayer, getRaids, getAspects, getOwedAspects, getLeaderboard, updateGuild, getPlayers, getGuild };

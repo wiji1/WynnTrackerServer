@@ -24,6 +24,12 @@ function getGuildRank(uuid) {
     });
 }
 
+async function getPlayerGuild(uuid) {
+    let player = await getWynnUser(uuid);
+    if (!player.guild || player.guild === "NULL") return null;
+    return player.guild.prefix;
+}
+
 async function isPlayerInGuild(uuid) {
     const configPath = join(__dirname, '../config.json');
     const data = fs.readFileSync(configPath, 'utf-8');
@@ -31,8 +37,7 @@ async function isPlayerInGuild(uuid) {
 
     let player = await getWynnUser(uuid);
     let guild = player.guild;
-    console.log(guild);
     return guild.prefix === config["guild-tag"];
 }
 
-module.exports = {getGuildRank, isPlayerInGuild};
+module.exports = {getGuildRank, isPlayerInGuild, getPlayerGuild};
