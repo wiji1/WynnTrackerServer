@@ -335,7 +335,7 @@ class RankService {
             }
 
             // Get the target member
-            const targetMember = await guild.members.fetch(discordId);
+            let targetMember = await guild.members.fetch(discordId);
             if (!targetMember) {
                 return { success: false, error: 'Target member not found' };
             }
@@ -380,25 +380,25 @@ class RankService {
                 };
             }
 
-            // Remove all existing rank roles, but preserve linked role and other non-rank roles
+            // Force fresh fetch to get the latest roles (including any just-added linked role)
+            const freshMember = await guild.members.fetch(discordId, { force: true });
+            
+            // Get all role IDs we need to preserve (everything except rank roles)
             const allRankRoleIds = Object.values(this.ranks).map(rank => rank['discord-role-id']);
-            const memberRankRoles = targetMember.roles.cache.filter(role => 
-                allRankRoleIds.includes(role.id)
+            const nonRankRoles = Array.from(freshMember.roles.cache.keys()).filter(roleId => 
+                !allRankRoleIds.includes(roleId)
             );
-
-            if (memberRankRoles.size > 0) {
-                console.log(`Removing existing rank roles: ${Array.from(memberRankRoles.keys()).join(', ')}`);
-                await targetMember.roles.remove(memberRankRoles);
-                console.log(`Rank roles removed. Remaining roles: ${Array.from(targetMember.roles.cache.keys()).join(', ')}`);
-            }
-
-            // Add the new rank role
+            
+            // Add the new rank role to the preserved roles
             const newRole = guild.roles.cache.get(newRankConfig['discord-role-id']);
             if (!newRole) {
                 return { success: false, error: `Rank role not found: ${newRankConfig.identifier}` };
             }
-
-            await targetMember.roles.add(newRole);
+            
+            const finalRoles = [...nonRankRoles, newRankConfig['discord-role-id']];
+            
+            // Set all roles at once to avoid caching issues
+            await freshMember.roles.set(finalRoles);
 
             // Update our cache directly with the known changes (immediate)
             if (this.memberCache.has(discordId)) {
@@ -412,7 +412,6 @@ class RankService {
                     ...cachedMember,
                     roles: updatedRoles
                 });
-                console.log(`Direct cache update: ${targetMember.displayName} roles updated to include ${newRankConfig.identifier}`);
             }
 
             // Send in-game promotion packet
@@ -730,13 +729,6 @@ class RankService {
         for (const [requestId, retryData] of this.retryQueue.entries()) {
             // Check if it's time to retry
             if (now < retryData.nextRetry) continue;
-
-            // TODO: Decide if this is needed
-            // if (retryData.attempts >= this.maxRetries) {
-            //     console.log(`Max retries exceeded for ${retryData.targetUsername} -> rank ${retryData.newRank}. Removing from queue.`);
-            //     this.retryQueue.delete(requestId);
-            //     continue;
-            // }
 
             try {
                 // Verify target is still eligible for this rank before retrying
