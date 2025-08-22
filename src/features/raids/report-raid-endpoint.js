@@ -2,55 +2,183 @@ const {getToken} = require("../auth/authentication");
 const {insertRaid, getPlayerUUID, insertPlayer} = require("../../core/database");
 const {requestUUID} = require("../../core/utilities");
 const {sendRaidEmbed} = require("./raid-message");
+const { config } = require("../../core/config");
 
-class ReportRaidEndpoint {
+class RaidReportService {
     constructor() {
-        this.recentRaids = new Map();
+        this.raidCache = new Map();
+        this.raidOccurrences = new Map();
+        this.clientRaidMap = new Map();
+        this.cacheExpiry = 30000;
+        this.cleanupInterval = 60000;
+        this.minClientThreshold = 1;
+        
+        this.startCleanup();
     }
 
-    async call(req, res) {
-        let token = req.query.token;
-        let {raid, player1, player2, player3, player4, reporter, seasonRating, guildXP} = req.query;
+    generateReportKey(player1, player2, player3, player4, raid) {
+        return `${player1}:${player2}:${player3}:${player4}:${raid}`;
+    }
 
-        if (!raid || !token || !player1 || !player2 || !player3 || !player4 || !reporter || !seasonRating || !guildXP) return res.status(400).send("Missing parameters");
+    generateRaidHash(reportKey, timestamp = null) {
+        const time = timestamp || Date.now();
+        return `${reportKey}:${Math.floor(time / 1000)}`;
+    }
 
-        const reportKey = `${player1}-${player2}--${player3}--${player4}`;
-        if (this.recentRaids.has(reportKey)) {
-            await this.recentRaids.get(reportKey);
-            return res.status(200).send("Raid reported");
+    isDuplicateRaid(reportKey, timestamp = null) {
+        const hash = this.generateRaidHash(reportKey, timestamp);
+        
+        if (this.raidCache.has(hash)) {
+            return true;
+        }
+        
+        this.raidCache.set(hash, Date.now());
+        return false;
+    }
+
+    shouldProcessRaid(reportKey, client, timestamp = null) {
+        const hash = this.generateRaidHash(reportKey, timestamp);
+        
+        if (!this.raidOccurrences.has(hash)) {
+            this.raidOccurrences.set(hash, {
+                count: 0,
+                clients: new Set(),
+                firstSeen: Date.now(),
+                processed: false
+            });
         }
 
-        const reportPromise = (async () => {
-            let tokenObject = await getToken(reporter);
+        const raidData = this.raidOccurrences.get(hash);
+        
+        const now = Date.now();
+        if (now - raidData.firstSeen > this.cacheExpiry) {
+            raidData.count = 0;
+            raidData.clients.clear();
+            raidData.firstSeen = now;
+            raidData.processed = false;
+        }
+        
+        if (raidData.processed) {
+            return false;
+        }
 
-            if (!tokenObject || tokenObject.serverId !== token || !tokenObject.isAuthenticated()) return res.status(400).send("Invalid token");
+        if (!raidData.clients.has(client)) {
+            raidData.clients.add(client);
+            raidData.count++;
+        }
 
-            let players = [player1, player2, player3, player4];
+        if (raidData.count >= config.get("minimum-client-threshold")) {
+            raidData.processed = true;
+            return true;
+        }
 
-            for (let i = 0; i < players.length; i++) {
-                let player = players[i];
+        return false;
+    }
 
-                let uuid = await getPlayerUUID(player);
 
-                if (!uuid) uuid = await requestUUID(player).uuid;
-                if (!uuid) return res.status(400).send("Invalid player: " + player);
+    async handleRaidReport(client, packet) {
+        const { raid, player1, player2, player3, player4, reporter, seasonRating, guildXP} = packet.data;
+        if (!raid || !player1 || !player2 || !player3 || !player4 || !seasonRating || !guildXP) {
+            console.warn(`Invalid raid report packet: missing required fields from client ${client.uuid}`);
+            return null;
+        }
 
-                players[i] = uuid;
+        const reportKey = this.generateReportKey(player1, player2, player3, player4, raid);
+        
+        if (!this.shouldProcessRaid(reportKey, client)) {
+            return null;
+        }
+
+        if (this.isDuplicateRaid(reportKey)) {
+            console.log(`Duplicate raid filtered: ${reportKey}`);
+            return null;
+        }
+
+        this.processRaidReport(raid, player1, player2, player3, player4, seasonRating, guildXP, reporter);
+
+        return {
+            type: 'raid_report_ack',
+            data: {
+                success: true,
+                timestamp: Date.now()
+            }
+        };
+        
+    }
+
+    async processRaidReport(raid, player1, player2, player3, player4, seasonRating, guildXP, reporter) {
+
+        const players = [player1, player2, player3, player4];
+        const resolvedUUIDs = [];
+
+        for (let i = 0; i < players.length; i++) {
+            const player = players[i];
+            let uuid = await getPlayerUUID(player);
+
+            if (!uuid) {
+                uuid = await requestUUID(player);
             }
 
-            console.log("Reporting raid: ", raid, player1, player2, player3, player4, reporter, seasonRating, guildXP);
+            if (!uuid) {
+                throw new Error(`Invalid player: ${player}`);
+            }
 
-            await insertRaid(raid, players[0], players[1], players[2], players[3], reporter, seasonRating, guildXP);
-            res.status(200).send("Raid reported");
+            resolvedUUIDs[i] = uuid;
+        }
+
+        console.log(`Processing raid report: ${raid} with players [${players.join(', ')}] reported by ${reporter}`);
+
+        await insertRaid(raid, resolvedUUIDs[0], resolvedUUIDs[1], resolvedUUIDs[2], resolvedUUIDs[3], reporter, seasonRating, guildXP);
+        
+        try {
             await sendRaidEmbed(raid, player1, player2, player3, player4);
-            setTimeout(() => {
-                this.recentRaids.delete(reportKey);
-            }, 1000 * 60);
-        })();
+            console.log(`Sent Discord notification for raid: ${raid}`);
+        } catch (error) {
+            console.error(`Failed to send Discord notification for raid ${raid}:`, error);
+        }
 
-        this.recentRaids.set(reportKey, reportPromise);
-        await reportPromise;
+        console.log(`Successfully reported raid: ${raid} with players [${players.join(', ')}] reported by ${reporter}`);
+
+        return;
+    }
+
+    startCleanup() {
+        setInterval(() => {
+            const now = Date.now();
+            const expiredEntries = [];
+            const expiredOccurrences = [];
+            
+            for (const [hash, timestamp] of this.raidCache.entries()) {
+                if (now - timestamp > this.cacheExpiry) {
+                    expiredEntries.push(hash);
+                }
+            }
+
+            for (const [hash, data] of this.raidOccurrences.entries()) {
+                if (now - data.firstSeen > this.cacheExpiry) {
+                    expiredOccurrences.push(hash);
+                }
+            }
+            
+            expiredEntries.forEach(hash => this.raidCache.delete(hash));
+            expiredOccurrences.forEach(hash => this.raidOccurrences.delete(hash));
+            
+            if (expiredEntries.length > 0) {
+                console.log(`Cleaned up ${expiredEntries.length} expired raid cache entries and ${expiredOccurrences.length} raid occurrences`);
+            }
+        }, this.cleanupInterval);
+    }
+
+    getStats() {
+        return {
+            recentRaidsCount: this.recentRaids.size,
+            pendingReportsCount: this.pendingReports.size,
+            cacheExpiry: this.cacheExpiry,
+            cleanupInterval: this.cleanupInterval
+        };
     }
 }
 
-module.exports = { ReportRaidEndpoint }
+const raidReport = new RaidReportService();
+
+module.exports = { RaidReportService, raidReport };

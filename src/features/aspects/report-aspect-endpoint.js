@@ -1,4 +1,4 @@
-const {getToken} = require("../auth/authentication");
+const {validateToken} = require("../auth/authentication");
 const {getPlayerUUID, insertAspect} = require("../../core/database");
 const {requestUUID} = require("../../core/utilities");
 
@@ -20,9 +20,15 @@ class ReportAspectEndpoint {
         }
 
         const reportPromise = (async () => {
-            let tokenObject = await getToken(reporter);
+            const validation = validateToken(token);
 
-            if (!tokenObject || tokenObject.serverId !== token || !tokenObject.isAuthenticated()) return res.status(400).send("Invalid token");
+            if (!validation.valid) {
+                return res.status(400).send("Invalid token");
+            }
+
+            if (validation.uuid !== reporter) {
+                return res.status(400).send("Token does not match reporter UUID");
+            }
 
             let giverUUID = await getPlayerUUID(giver);
             let receiverUUID = await getPlayerUUID(receiver);

@@ -2,7 +2,7 @@ const { config } = require('../../core/config');
 const accountLinkingService = require('./account-linking-service');
 const roleManager = require('./role-manager');
 const { rankService } = require('../ranks/rank-service');
-const { getToken } = require('../auth/authentication');
+const { validateToken } = require('../auth/authentication');
 
 class VerifyLinkEndpoint {
     async call(req, res) {
@@ -14,14 +14,25 @@ class VerifyLinkEndpoint {
                 return res.status(400).json(validationError);
             }
 
-            const authValid = await this.validateAuthentication(uuid, token);
-            if (!authValid) {
-                return res.status(401).json({
+            // Verify the authentication token for this UUID
+            const validation = validateToken(token);
+
+            if (!validation.valid) {
+                return res.status(400).json({
                     success: false,
                     error: 'Invalid or expired authentication token'
                 });
             }
 
+            // Ensure the token belongs to the reporter UUID
+            if (validation.uuid !== reporter) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Token does not match reporter UUI'
+                });
+            }
+
+            // Verify the account link with additional UUID validation
             const result = await accountLinkingService.verifyLinkWithAuth(code, uuid);
 
             if (result.success) {
@@ -89,7 +100,7 @@ class VerifyLinkEndpoint {
             const member = await guild.members.fetch(link.discordId, { force: true });
             const linkedRoleId = roleManager.linkedRoleId;
             const ranks = roleManager.ranks;
-            
+
             if (!linkedRoleId) {
                 console.warn('No linked role configured');
                 return;
@@ -97,19 +108,19 @@ class VerifyLinkEndpoint {
 
             // Get current roles
             const currentRoles = Array.from(member.roles.cache.keys());
-            
+
             // Check if user has any rank roles
             const allRankRoleIds = Object.values(ranks).map(rank => rank['discord-role-id']);
             const hasRankRole = currentRoles.some(roleId => allRankRoleIds.includes(roleId));
-            
+
             // Build final role set: current roles + linked role + recruit role (if needed)
             let finalRoles = [...currentRoles];
-            
+
             // Add linked role if not already present
             if (!finalRoles.includes(linkedRoleId)) {
                 finalRoles.push(linkedRoleId);
             }
-            
+
             // Add recruit role if user has no rank roles
             if (!hasRankRole) {
                 const recruitRoleId = ranks.recruit?.['discord-role-id'];
@@ -117,10 +128,10 @@ class VerifyLinkEndpoint {
                     finalRoles.push(recruitRoleId);
                 }
             }
-            
+
             await member.roles.set(finalRoles);
             console.log(`Account successfully linked and roles assigned for ${link.discordId}`);
-            
+
         } catch (error) {
             console.error('Error in atomic role assignment:', error);
         }

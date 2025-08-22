@@ -1,4 +1,4 @@
-const {getToken} = require("../auth/authentication");
+const {validateToken} = require("../auth/authentication");
 const {toggleNeedsAspects} = require("../../core/database");
 class ToggleAspectsEndpoint {
 
@@ -6,7 +6,7 @@ class ToggleAspectsEndpoint {
         let token = req.query.token;
         let {reporter} = req.query;
 
-        let tokenObject = await getToken(reporter);
+        const validation = validateToken(token);
 
         if (!tokenObject || tokenObject.serverId !== token || !tokenObject.isAuthenticated()) return res.status(400).send("Invalid token");
 

@@ -1,14 +1,18 @@
 const crypto = require('crypto');
 
-const tokenMap = new Map();
-const wsTokenLookup = new Map();
-const mojangServerIds = new Map();
+// Enhanced token storage with separate WebSocket and Mojang tokens
+const tokenMap = new Map(); // uuid -> Token
+const wsTokenLookup = new Map(); // wsToken -> uuid (for WebSocket authentication)
+const mojangServerIds = new Map(); // serverId -> uuid (for Mojang authentication)
 
-const TOKEN_EXPIRY_TIME = 6 * 60 * 60 * 1000;
-const VALIDATION_CACHE_TIME = 30 * 60 * 1000;
+const TOKEN_EXPIRY_TIME = 6 * 60 * 60 * 1000; // 6 hours
+const VALIDATION_CACHE_TIME = 30 * 60 * 1000; // 30 minutes
 
 function addUser(uuid, wsToken, serverId = null) {
-    removeToken(uuid);
+    const existingToken = tokenMap.get(uuid);
+    if (existingToken) {
+        removeToken(uuid);
+    }
     
     const token = new Token(wsToken, serverId);
     tokenMap.set(uuid, token);
@@ -17,8 +21,6 @@ function addUser(uuid, wsToken, serverId = null) {
     if (serverId) {
         mojangServerIds.set(serverId, uuid);
     }
-    
-    console.log(`Added tokens for UUID: ${uuid} - WS: ${wsToken.substring(0, 8)} ServerId: ${serverId ? serverId.substring(0, 8) + '' : 'none'}`);
 }
 
 function getToken(uuid) {
@@ -26,7 +28,6 @@ function getToken(uuid) {
     if (!token) return null;
     
     if (token.isExpired()) {
-        console.log(`Token expired for UUID: ${uuid}`);
         removeToken(uuid);
         return null;
     }
@@ -36,7 +37,6 @@ function getToken(uuid) {
 
 function generateToken(uuid, serverId = null) {
     const wsToken = crypto.randomBytes(32).toString('hex');
-    
     addUser(uuid, wsToken, serverId);
     return wsToken;
 }
@@ -52,19 +52,31 @@ function generateTokenWithServerId(uuid) {
 function removeToken(uuid) {
     const token = tokenMap.get(uuid);
     if (token) {
+        const stack = new Error().stack;
+        const caller = stack.split('\n')[2].trim();
+        const age = token.getAge();
+        const isFromGuildUpdate = caller.includes('database.js') || caller.includes('updateGuild');
+        
+        if (isFromGuildUpdate && age < 300000) { // Less than 5 minutes old
+            return false; // Don't remove the token
+        }
+        
         wsTokenLookup.delete(token.wsToken);
-                if (token.serverId) {
+        
+        if (token.serverId) {
             mojangServerIds.delete(token.serverId);
         }
         
         tokenMap.delete(uuid);
-        console.log(`Removed all tokens for UUID: ${uuid}`);
+        return true;
     }
+    return false;
 }
 
 function findUuidByToken(tokenString) {
     if (!tokenString) return null;
-        const uuid = wsTokenLookup.get(tokenString);
+    
+    const uuid = wsTokenLookup.get(tokenString);
     if (uuid) {
         const token = getToken(uuid);
         if (token && token.isAuthenticated()) {
@@ -94,7 +106,16 @@ function validateToken(tokenString) {
         return { valid: false, reason: 'No token provided' };
     }
 
-    const uuid = wsTokenLookup.get(tokenString);
+    let uuid = null;
+
+    // First, try to find UUID by WebSocket token
+    uuid = wsTokenLookup.get(tokenString);
+    
+    // If not found, try to find UUID by server ID
+    if (!uuid) {
+        uuid = mojangServerIds.get(tokenString);
+    }
+
     if (!uuid) {
         return { valid: false, reason: 'Token not found' };
     }
@@ -102,6 +123,7 @@ function validateToken(tokenString) {
     const token = tokenMap.get(uuid);
     if (!token) {
         wsTokenLookup.delete(tokenString);
+        mojangServerIds.delete(tokenString);
         return { valid: false, reason: 'Token data not found' };
     }
 
@@ -132,11 +154,9 @@ function authenticateServerId(serverId) {
         const token = getToken(uuid);
         if (token && token.serverId === serverId) {
             token.authenticate();
-            console.log(`Authenticated server id ${serverId.substring(0, 8)}... for UUID ${uuid}`);
             return true;
         }
     }
-    console.error(`Could not authenticate server id: ${serverId}`);
     return false;
 }
 
@@ -187,6 +207,44 @@ function invalidateUuidTokens(uuid) {
     return false;
 }
 
+function getAllTokens() {
+    return tokenMap;
+}
+
+function getAuthStats() {
+    const now = Date.now();
+    let activeTokens = 0;
+    let expiringSoon = 0;
+    let authenticatedTokens = 0;
+    let tokensWithServerId = 0;
+
+    tokenMap.forEach((token) => {
+        const age = now - token.createdAt.getTime();
+        if (age < TOKEN_EXPIRY_TIME) {
+            activeTokens++;
+            if (age > TOKEN_EXPIRY_TIME - (60 * 60 * 1000)) {
+                expiringSoon++;
+            }
+            if (token.isAuthenticated()) {
+                authenticatedTokens++;
+            }
+            if (token.serverId) {
+                tokensWithServerId++;
+            }
+        }
+    });
+
+    return {
+        totalTokens: tokenMap.size,
+        activeTokens,
+        authenticatedTokens,
+        tokensWithServerId,
+        expiringSoon,
+        wsTokenLookups: wsTokenLookup.size,
+        mojangServerIds: mojangServerIds.size
+    };
+}
+
 function startTokenCleanup() {
     setInterval(() => {
         const expiredUuids = [];
@@ -200,11 +258,18 @@ function startTokenCleanup() {
         expiredUuids.forEach(uuid => {
             removeToken(uuid);
         });
+    }, 60000); // Run every minute
+}
 
-        if (expiredUuids.length > 0) {
-            console.log(`Cleaned up ${expiredUuids.length} expired tokens`);
-        }
-    }, 60000);
+function safeRemoveTokenForGuildUpdate(uuid, reason = 'guild_update') {
+    const token = tokenMap.get(uuid);
+    if (!token) return false;
+    
+    if (reason === 'player_kicked' || reason === 'player_left' || reason === 'player_removed') {
+        return removeToken(uuid);
+    } else {
+        return false;
+    }
 }
 
 class Token {
@@ -219,7 +284,6 @@ class Token {
     authenticate() {
         this.authenticated = true;
         this.lastValidated = new Date();
-        console.log(`Token authenticated for socket: ${this.wsToken.substring(0, 8)}`);
     }
 
     isAuthenticated() {
@@ -235,9 +299,8 @@ class Token {
         this.lastValidated = new Date();
         
         const age = this.getAge();
-        if (age > 4 * 60 * 60 * 1000) {
-            console.log(`Extending token life for token: ${this.wsToken.substring(0, 8)}`);
-            this.createdAt = new Date(Date.now() - (2 * 60 * 60 * 1000));
+        if (age > 4 * 60 * 60 * 1000) { // 4 hours
+            this.createdAt = new Date(Date.now() - (2 * 60 * 60 * 1000)); // Reset age to 2 hours
         }
     }
 
@@ -261,6 +324,7 @@ module.exports = {
     generateTokenWithServerId,
     getToken, 
     removeToken, 
+    safeRemoveTokenForGuildUpdate,
     findUuidByToken,
     findUuidByServerId,
     validateToken,
@@ -269,5 +333,7 @@ module.exports = {
     getAuthenticationStatus,
     invalidateToken,
     invalidateUuidTokens,
+    getAllTokens, 
+    getAuthStats,
     Token
 };
