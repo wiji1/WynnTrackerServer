@@ -5,15 +5,12 @@ const accountLinkingService = require('../account-linking/account-linking-servic
 const { rankService } = require('../ranks/rank-service');
 const {requestUUID} = require("../../core/utilities");
 const {analyzeAndFormatItems} = require("./encoded-item");
-const { config } = require("../../core/config");
 
 
 class ChatBridgeService {
     constructor() {
         this.discordWebhook = new DiscordWebhook();
         this.messageCache = new Map();
-        this.messageOccurrences = new Map();
-        this.clientMessageMap = new Map();
         this.cacheExpiry = 5000; // 5 seconds
         this.cleanupInterval = 30000; // 30 seconds
 
@@ -42,45 +39,6 @@ class ChatBridgeService {
         return false;
     }
 
-    shouldProcessMessage(username, message, client, timestamp = null) {
-        const hash = this.generateMessageHash(username, message, timestamp);
-        
-        if (!this.messageOccurrences.has(hash)) {
-            this.messageOccurrences.set(hash, {
-                count: 0,
-                clients: new Set(),
-                firstSeen: Date.now(),
-                processed: false
-            });
-        }
-
-        const messageData = this.messageOccurrences.get(hash);
-        
-        const now = Date.now();
-        if (now - messageData.firstSeen > this.cacheExpiry) {
-            messageData.count = 0;
-            messageData.clients.clear();
-            messageData.firstSeen = now;
-            messageData.processed = false;
-        }
-        
-        if (messageData.processed) {
-            return false;
-        }
-
-        if (!messageData.clients.has(client)) {
-            messageData.clients.add(client);
-            messageData.count++;
-        }
-
-        if (messageData.count >= config.get("minimum-client-threshold")) {
-            messageData.processed = true;
-            return true;
-        }
-
-        return false;
-    }
-
     async handleMinecraftMessage(client, packet) {
         const { username, message } = packet.data;
         const uuidAndName = await requestUUID(username);
@@ -93,10 +51,6 @@ class ChatBridgeService {
 
         if (!username || !message) {
             console.warn('Invalid chat message packet: missing username or message');
-            return null;
-        }
-
-        if (!this.shouldProcessMessage(username, message, client)) {
             return null;
         }
 
@@ -188,31 +142,24 @@ class ChatBridgeService {
 
         wsManager.broadcast(messageData.type, messageData.data);
         console.log(`Bridged message to Minecraft clients from ${minecraftUsername} (Discord: ${author.username}${userRank ? ` - ${userRank.identifier}` : ''})`);
+        
     }
 
     startCleanup() {
         setInterval(() => {
             const now = Date.now();
             const expiredEntries = [];
-            const expiredOccurrences = [];
             
             for (const [hash, timestamp] of this.messageCache.entries()) {
                 if (now - timestamp > this.cacheExpiry) {
                     expiredEntries.push(hash);
                 }
             }
-
-            for (const [hash, data] of this.messageOccurrences.entries()) {
-                if (now - data.firstSeen > this.cacheExpiry) {
-                    expiredOccurrences.push(hash);
-                }
-            }
             
             expiredEntries.forEach(hash => this.messageCache.delete(hash));
-            expiredOccurrences.forEach(hash => this.messageOccurrences.delete(hash));
             
             if (expiredEntries.length > 0) {
-                console.log(`Cleaned up ${expiredEntries.length} expired message cache entries and ${expiredOccurrences.length} message occurrences`);
+                console.log(`Cleaned up ${expiredEntries.length} expired message cache entries`);
             }
         }, this.cleanupInterval);
     }

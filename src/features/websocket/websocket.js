@@ -163,6 +163,9 @@ class WebSocketManager {
                 return;
             }
 
+            // Don't validate tokens on every message - trust the authenticated connection
+            // Token validation was causing disconnections during normal operation
+
             console.log(`Packet from ${clientId} (${client.uuid || 'unauthenticated'}):`, packet);
             const response = await this.packetHandler.handlePacket(client, packet);
             

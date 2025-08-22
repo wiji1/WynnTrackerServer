@@ -12,8 +12,6 @@ const PACKET_TYPES = {
     RANK_PROMOTION_REQUEST: 'rank_promotion_request',
     RANK_PROMOTION_RESPONSE: 'rank_promotion_response',
     CHAT_ANNOUNCEMENT: 'chat_announcement',
-    RAID_REPORT: 'raid_report',
-    RAID_REPORT_ACK: 'raid_report_ack',
     CONNECT: 'connect',
     DISCONNECT: 'disconnect',
     PONG: 'pong',
@@ -39,11 +37,6 @@ const heartbeatHandler = async (client, packet) => {
 const chatMessageHandler = async (client, packet) => {
     const { chatBridge } = require('../chat-bridge/chat-bridge-service');
     return await chatBridge.handleMinecraftMessage(client, packet);
-};
-
-const raidReportHandler = async (client, packet) => {
-    const { raidReport } = require('../raids/report-raid-endpoint');
-    return await raidReport.handleRaidReport(client, packet);
 };
 
 const connectHandler = async (client, packet) => {
@@ -102,7 +95,6 @@ const PACKET_HANDLERS = {
     [PACKET_TYPES.PING]: pingHandler,
     [PACKET_TYPES.HEARTBEAT]: heartbeatHandler,
     [PACKET_TYPES.CHAT_MESSAGE]: chatMessageHandler,
-    [PACKET_TYPES.RAID_REPORT]: raidReportHandler,
     [PACKET_TYPES.RANK_PROMOTION_RESPONSE]: rankPromotionResponseHandler,
     [PACKET_TYPES.CHAT_ANNOUNCEMENT]: chatAnnouncementHandler,
     [PACKET_TYPES.CONNECT]: connectHandler,
@@ -115,7 +107,6 @@ module.exports = {
     pingHandler,
     heartbeatHandler,
     chatMessageHandler,
-    raidReportHandler,
     rankPromotionResponseHandler,
     chatAnnouncementHandler,
     connectHandler,

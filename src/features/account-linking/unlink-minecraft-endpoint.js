@@ -18,20 +18,11 @@ class UnlinkMinecraftEndpoint {
             }
 
             // Verify the authentication token for this UUID
-            const validation = validateToken(token);
-        
-            if (!validation.valid) {
-                return res.status(400).json({
+            const tokenObject = await getToken(uuid);
+            if (!tokenObject || tokenObject.serverId !== token || !tokenObject.isAuthenticated()) {
+                return res.status(401).json({
                     success: false,
                     error: 'Invalid or expired authentication token'
-                });
-            }
-
-            // Ensure the token belongs to the reporter UUID
-            if (validation.uuid !== reporter) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Token does not match reporter UUI'
                 });
             }
 

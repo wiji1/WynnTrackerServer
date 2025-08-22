@@ -3,7 +3,6 @@
   "clientId": "DISCORD_CLIENT_ID",
   "guild-tag": "TBGM",
   "minimum-rank": 2,
-  "minimum-client-threshold": 2,
   "wynncraft-token": "WYNNCRAFT_API_TOKEN",
   "host-port": 8080,
   "account-linking": {
