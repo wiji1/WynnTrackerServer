@@ -12,7 +12,7 @@ const raidsAbbr = [
   { name: "NOTG", id: 0 },
   { name: "NOL", id: 1 },
   { name: "TCC", id: 2 },
-  { name: "TNA", id: 3 },
+  { name: "TNA", id: 3 }
 ]
 
 const mapping = {
@@ -248,4 +248,4 @@ function requestItemAnalysis(item) {
     });
   });
 }
-module.exports = {sleep, requestUUID, requestUsername, raids, daysToTimestamp, getLastPoolReset, requestItemAnalysis};
+module.exports = {sleep, requestUUID, requestUsername, raids, raidsAbbr, daysToTimestamp, getLastPoolReset, requestItemAnalysis};

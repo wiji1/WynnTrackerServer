@@ -2,7 +2,7 @@ const { config } = require('../../core/config');
 const accountLinkingService = require('./account-linking-service');
 const roleManager = require('./role-manager');
 const { rankService } = require('../ranks/rank-service');
-const { getToken } = require('../auth/authentication');
+const { validateToken } = require('../auth/authentication');
 
 class VerifyLinkEndpoint {
     async call(req, res) {
@@ -25,11 +25,20 @@ class VerifyLinkEndpoint {
             }
 
             // Verify the authentication token for this UUID
-            const tokenObject = await getToken(uuid);
-            if (!tokenObject || tokenObject.serverId !== token || !tokenObject.isAuthenticated()) {
-                return res.status(401).json({
+            const validation = validateToken(token);
+        
+            if (!validation.valid) {
+                return res.status(400).json({
                     success: false,
                     error: 'Invalid or expired authentication token'
+                });
+            }
+
+            // Ensure the token belongs to the reporter UUID
+            if (validation.uuid !== reporter) {
+                return res.status(400).json({
+                    success: false,
+                    error: 'Token does not match reporter UUI'
                 });
             }
 

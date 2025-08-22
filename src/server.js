@@ -37,7 +37,6 @@ server.listen(PORT, '0.0.0.0', async (error) => {
 
 const endpoints = {
     'authenticate': new AuthenticateEndpoint(),
-    'report-raid': new ReportRaidEndpoint(),
     'report-aspect': new ReportAspectEndpoint(),
     'is-authenticated': new IsAuthenticatedEndpoint(),
     'toggle-aspects': new ToggleAspectsEndpoint(),
